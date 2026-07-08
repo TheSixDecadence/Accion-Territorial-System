@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const moduleItems = [
   { label: "Rutas", href: "/rutas" },
@@ -12,9 +15,19 @@ const adminItems = [
   { label: "Reportes", href: "/reportes" },
 ];
 
-const Navbar = ({ activeItem = "Rutas" }) => {
+const navItems = [...moduleItems, ...adminItems];
+
+const Navbar = () => {
+  const pathname = usePathname();
+  const activeItem =
+    navItems.find((item) => {
+      return pathname === item.href || pathname.startsWith(`${item.href}/`);
+    })?.label ?? "Rutas";
+
   return (
-    <aside className="min-h-screen w-[176px] shrink-0 bg-[#2E3180] px-5 py-6 text-[#F7F8F7]">
+    <aside
+      className="min-h-screen w-[176px] shrink-0 bg-[#2E3180] px-5 py-6 text-[#F7F8F7]"
+    >
       <Link href="/" className="block">
         <span className="block text-[11px] font-bold uppercase leading-tight">
           Accion Territorial
@@ -48,7 +61,9 @@ const NavGroup = ({ activeItem, className = "", items, title }) => {
           return (
             <Link
               className={`flex rounded-md px-3 py-3 text-[11px] font-semibold uppercase transition ${
-                isActive ? "bg-[#4A4EA8] shadow-md" : "hover:bg-[#4A4EA8]/70"
+                isActive
+                  ? "bg-[#4A4EA8] shadow-md"
+                  : "hover:bg-[#4A4EA8]/70"
               }`}
               href={item.href}
               key={item.href}
