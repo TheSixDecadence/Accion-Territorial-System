@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { authenticatedApiFetch } from "@/app/Libs/apiFetch";
 import Button from "@/app/UI/Shared/Button";
 import Modal from "@/app/UI/Shared/Modal";
+import Notification from "@/app/UI/Shared/Notification";
 import PageHeader from "@/app/UI/Shared/PageHeader";
 import Pagination from "@/app/UI/Shared/Pagination";
 import UserForm from "./UserForm";
@@ -14,11 +15,19 @@ const roleLabels = {
   STAFF: "Personal",
 };
 
+const successMessages = {
+  created: "Usuario creado correctamente",
+  updated: "Usuario actualizado correctamente",
+  deactivated: "Usuario desactivado correctamente",
+  passwordUpdated: "Contraseña actualizada correctamente",
+};
+
 export default function Wrapper() {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [modal, setModal] = useState(null);
+  const [notification, setNotification] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -43,6 +52,7 @@ export default function Wrapper() {
   }, []);
 
   const closeModal = () => setModal(null);
+  const closeNotification = useCallback(() => setNotification(""), []);
 
   const saveUser = async (values, formikHelpers) => {
     const isEditing = modal?.type === "edit";
@@ -75,6 +85,7 @@ export default function Wrapper() {
         ? current.map((user) => (user.id === response.id ? response : user))
         : [...current, response],
     );
+    setNotification(isEditing ? successMessages.updated : successMessages.created);
     closeModal();
   };
 
@@ -97,6 +108,10 @@ export default function Wrapper() {
           onSubmit={saveUser}
         />
       </Modal>
+      <Notification
+        message={notification}
+        onClose={closeNotification}
+      />
     </UsersPage>
   );
 }
