@@ -1,5 +1,5 @@
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/auth/login/";
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
 const DEFAULT_TIMEOUT_MS = 15000;
 
 export default async function apiFetch({
