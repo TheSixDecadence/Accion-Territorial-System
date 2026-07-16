@@ -36,7 +36,7 @@ export default function Modal({
         aria-describedby={description ? "modal-description" : undefined}
         aria-labelledby="modal-title"
         aria-modal="true"
-        className="my-auto w-full max-w-lg rounded-xl border border-[var(--color-border)] bg-white p-5 shadow-[var(--shadow-modal)] sm:p-7"
+        className="my-auto w-full max-w-lg rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[var(--shadow-modal)] sm:p-7"
         onMouseDown={(event) => event.stopPropagation()}
         role="dialog"
       >

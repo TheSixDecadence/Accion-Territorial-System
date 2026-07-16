@@ -3,10 +3,10 @@
 import { useEffect } from "react";
 import apiFetch from "@/app/Libs/apiFetch";
 import { useAuth } from "@/app/store/useAuth";
-import { logoutUser, refreshSession } from "../authHelpers";
+import { refreshSession } from "../authHelpers";
 
 export default function AuthProvider({ children }) {
-  const { accessToken, setSessionVerified, setUser } = useAuth();
+  const { accessToken, clearAuth, setSessionVerified, setUser } = useAuth();
 
   useEffect(() => {
     let active = true;
@@ -26,7 +26,7 @@ export default function AuthProvider({ children }) {
 
       if (response?.error && response.status === 401) {
         if (!(await refreshSession())) {
-          logoutUser();
+          clearAuth();
           return;
         }
 
@@ -39,7 +39,7 @@ export default function AuthProvider({ children }) {
       if (!active) return;
 
       if (response?.error) {
-        logoutUser();
+        clearAuth();
         return;
       }
 
@@ -51,7 +51,7 @@ export default function AuthProvider({ children }) {
     return () => {
       active = false;
     };
-  }, [accessToken, setSessionVerified, setUser]);
+  }, [accessToken, clearAuth, setSessionVerified, setUser]);
 
   return children;
 }

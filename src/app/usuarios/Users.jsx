@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { authenticatedApiFetch } from "@/app/Libs/apiFetch";
 import Button from "@/app/UI/Shared/Button";
+import Modal from "@/app/UI/Shared/Modal";
 import PageHeader from "@/app/UI/Shared/PageHeader";
+import Pagination from "@/app/UI/Shared/Pagination";
+import UserForm from "./UserForm";
 
 const roleLabels = {
   ADMIN: "Administrador",
@@ -11,10 +14,11 @@ const roleLabels = {
   STAFF: "Personal",
 };
 
-export default function Users() {
+export default function Wrapper() {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [modal, setModal] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -38,11 +42,78 @@ export default function Users() {
     };
   }, []);
 
+  const closeModal = () => setModal(null);
+
+  const saveUser = async (values, formikHelpers) => {
+    const isEditing = modal?.type === "edit";
+    const payload = {
+      first_name: values.first_name.trim(),
+      last_name: values.last_name.trim(),
+      email: values.email.trim(),
+      phone: values.phone.trim(),
+      role: values.role,
+      ...(!isEditing && { password: values.password }),
+    };
+    const response = await authenticatedApiFetch({
+      url: isEditing ? `/users/${modal.user.id}/` : "/users/",
+      method: isEditing ? "PATCH" : "POST",
+      payload,
+    });
+
+    if (response?.error) {
+      formikHelpers.setStatus(
+        getApiError(response.data) ||
+        response.message ||
+        "No fue posible guardar el usuario.",
+      );
+      formikHelpers.setSubmitting(false);
+      return;
+    }
+
+    setUsers((current) =>
+      isEditing
+        ? current.map((user) => (user.id === response.id ? response : user))
+        : [...current, response],
+    );
+    closeModal();
+  };
+
+  return (
+    <UsersPage
+      error={error}
+      isLoading={isLoading}
+      onCreate={() => setModal({ type: "create" })}
+      onEdit={(user) => setModal({ type: "edit", user })}
+      users={users}
+    >
+      <Modal
+        onClose={closeModal}
+        open={Boolean(modal)}
+        title={modal?.type === "edit" ? "Editar Usuario" : "Nuevo Usuario"}
+      >
+        <UserForm
+          initialUser={modal?.type === "edit" ? modal.user : null}
+          onCancel={closeModal}
+          onSubmit={saveUser}
+        />
+      </Modal>
+    </UsersPage>
+  );
+}
+
+function UsersPage({ children, error, isLoading, onCreate, onEdit, users }) {
+  const pageSize = 10;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(users.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const firstUserIndex = (currentPage - 1) * pageSize;
+  const visibleUsers = users.slice(firstUserIndex, firstUserIndex + pageSize);
+
   return (
     <div className="flex min-h-screen w-full flex-1 flex-col bg-[var(--color-background)]">
       <PageHeader
-        actionDisabled
         actionLabel="Nuevo Usuario"
+        onAction={onCreate}
         title="Usuarios"
       />
 
@@ -69,7 +140,7 @@ export default function Users() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((user) => (
+                  {visibleUsers.map((user) => (
                     <tr
                       className="border-b border-[var(--color-border)] last:border-b-0"
                       key={user.id}
@@ -85,7 +156,7 @@ export default function Users() {
                       <Cell>
                         <Button
                           className="min-h-7 px-4 py-1 text-xs"
-                          disabled
+                          onClick={() => onEdit(user)}
                           variant="secondary"
                         >
                           Editar
@@ -97,10 +168,26 @@ export default function Users() {
               </table>
             </div>
           )}
+          {!isLoading && !error && users.length > 0 ? (
+            <Pagination
+              label={`Mostrando ${visibleUsers.length} de ${users.length} usuarios`}
+              onNext={() => setPage((current) => current + 1)}
+              onPrevious={() => setPage((current) => current - 1)}
+              page={currentPage}
+              totalPages={totalPages}
+            />
+          ) : null}
         </div>
       </section>
+      {children}
     </div>
   );
+}
+
+function getApiError(data) {
+  if (!data || typeof data !== "object") return "";
+  const firstError = Object.values(data).flat()[0];
+  return typeof firstError === "string" ? firstError : "";
 }
 
 function HeaderCell({ children }) {

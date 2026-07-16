@@ -19,5 +19,3 @@ export const refreshSession = async () => {
   if (response.refresh) setRefreshToken(response.refresh);
   return true;
 };
-
-export const logoutUser = () => useAuth.getState().clearAuth();

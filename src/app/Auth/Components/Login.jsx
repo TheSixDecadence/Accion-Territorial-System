@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Field, Form, Formik } from "formik";
 import apiFetch from "@/app/Libs/apiFetch";
@@ -102,6 +102,10 @@ export default function Wrapper() {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    if (accessToken) router.replace("/");
+  }, [accessToken, router]);
+
   const handleSubmit = async (values) => {
     setIsLoading(true);
     setError(null);
@@ -129,7 +133,7 @@ export default function Wrapper() {
     setRefreshToken(response.refresh);
     setSessionVerified(true);
     setIsLoading(false);
-    router.push("/rutas");
+    router.replace("/");
   };
 
   if (accessToken) return null;

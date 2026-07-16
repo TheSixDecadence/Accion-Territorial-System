@@ -1,5 +1,5 @@
 export const controlClass =
-  "min-h-11 w-full rounded-lg border border-[var(--color-border)] bg-white px-3 text-sm text-[var(--color-text)] placeholder:text-slate-400 focus:border-[var(--color-primary-soft)] focus:outline-none";
+  "min-h-11 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] placeholder:text-slate-400 focus:border-[var(--color-primary-soft)] focus:outline-none";
 
 export default function Field({ children, error, htmlFor, label }) {
   return (

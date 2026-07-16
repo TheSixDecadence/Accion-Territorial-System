@@ -26,6 +26,7 @@ export default async function apiFetch({
 
     if (!response.ok) {
       return {
+        data,
         error: true,
         message: data?.detail || data?.message || null,
         status: response.status,
@@ -54,12 +55,10 @@ export async function authenticatedApiFetch(options) {
 
   if (!response?.error || response.status !== 401) return response;
 
-  const { logoutUser, refreshSession } = await import(
-    "@/app/Auth/authHelpers"
-  );
+  const { refreshSession } = await import("@/app/Auth/authHelpers");
 
   if (!(await refreshSession())) {
-    await logoutUser();
+    useAuth.getState().clearAuth();
     return response;
   }
 
