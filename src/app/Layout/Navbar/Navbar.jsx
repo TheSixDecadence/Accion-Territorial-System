@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/app/store/useAuth";
 
 const moduleItems = [
   { label: "Rutas", href: "/rutas" },
@@ -10,15 +11,14 @@ const moduleItems = [
   { label: "Distritos", href: "/distritos" },
 ];
 
-const adminItems = [
-  { label: "Usuarios", href: "/usuarios" },
-  { label: "Reportes", href: "/reportes" },
-];
-
-const navItems = [...moduleItems, ...adminItems];
+const usersItem = { label: "Usuarios", href: "/usuarios" };
+const reportsItem = { label: "Reportes", href: "/reportes" };
 
 const Navbar = () => {
   const pathname = usePathname();
+  const role = useAuth((state) => state.user?.role);
+  const adminItems = role === "ADMIN" ? [usersItem, reportsItem] : [reportsItem];
+  const navItems = [...moduleItems, ...adminItems];
   const activeItem =
     navItems.find((item) => {
       return pathname === item.href || pathname.startsWith(`${item.href}/`);
