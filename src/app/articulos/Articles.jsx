@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { authenticatedApiFetch } from "@/app/Libs/apiFetch";
 import { useAuth } from "@/app/store/useAuth";
 import Button from "@/app/UI/Shared/Button";
+import Modal from "@/app/UI/Shared/Modal";
+import Notification from "@/app/UI/Shared/Notification";
 import PageHeader from "@/app/UI/Shared/PageHeader";
 import Pagination from "@/app/UI/Shared/Pagination";
+import ArticleForm from "./ArticleForm";
 
 const pageSize = 10;
 
@@ -14,6 +17,8 @@ export default function Wrapper() {
   const [articles, setArticles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [notification, setNotification] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -41,17 +46,67 @@ export default function Wrapper() {
     };
   }, []);
 
+  const closeNotification = useCallback(() => setNotification(""), []);
+
+  const createArticle = async (values, formikHelpers) => {
+    const response = await authenticatedApiFetch({
+      url: "/delivery/items/",
+      method: "POST",
+      payload: {
+        name: values.name.trim(),
+        description: values.description.trim(),
+      },
+    });
+
+    if (response?.error) {
+      formikHelpers.setStatus(
+        getApiError(response.data) ||
+          response.message ||
+          "No fue posible crear el artículo.",
+      );
+      formikHelpers.setSubmitting(false);
+      return;
+    }
+
+    setArticles((current) => [...current, response]);
+    setIsCreateOpen(false);
+    setNotification("Artículo creado correctamente");
+  };
+
   return (
     <ArticlesPage
       articles={articles}
       error={error}
       isAdmin={role === "ADMIN"}
       isLoading={isLoading}
-    />
+      onCreate={() => setIsCreateOpen(true)}
+    >
+      <Modal
+        onClose={() => setIsCreateOpen(false)}
+        open={isCreateOpen}
+        title="Nuevo Artículo"
+      >
+        <ArticleForm
+          onCancel={() => setIsCreateOpen(false)}
+          onSubmit={createArticle}
+        />
+      </Modal>
+      <Notification
+        message={notification}
+        onClose={closeNotification}
+      />
+    </ArticlesPage>
   );
 }
 
-function ArticlesPage({ articles, error, isAdmin, isLoading }) {
+function ArticlesPage({
+  articles,
+  children,
+  error,
+  isAdmin,
+  isLoading,
+  onCreate,
+}) {
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(articles.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -64,8 +119,8 @@ function ArticlesPage({ articles, error, isAdmin, isLoading }) {
   return (
     <div className="flex min-h-screen w-full flex-1 flex-col bg-[var(--color-background)]">
       <PageHeader
-        actionDisabled
         actionLabel={isAdmin ? "Nuevo Artículo" : undefined}
+        onAction={onCreate}
         title="Artículos"
       />
 
@@ -84,7 +139,6 @@ function ArticlesPage({ articles, error, isAdmin, isLoading }) {
                   <tr className="border-b border-[var(--color-border)]">
                     <HeaderCell>Nombre</HeaderCell>
                     <HeaderCell>Descripción</HeaderCell>
-                    <HeaderCell>Estado</HeaderCell>
                     {isAdmin ? (
                       <HeaderCell>
                         <span className="sr-only">Acciones</span>
@@ -102,7 +156,6 @@ function ArticlesPage({ articles, error, isAdmin, isLoading }) {
                         {article.name}
                       </Cell>
                       <Cell>{article.description || "—"}</Cell>
-                      <Cell>{article.is_active ? "Activo" : "Inactivo"}</Cell>
                       {isAdmin ? (
                         <Cell>
                           <Button
@@ -132,8 +185,15 @@ function ArticlesPage({ articles, error, isAdmin, isLoading }) {
           ) : null}
         </div>
       </section>
+      {children}
     </div>
   );
+}
+
+function getApiError(data) {
+  if (!data || typeof data !== "object") return "";
+  const firstError = Object.values(data).flat()[0];
+  return typeof firstError === "string" ? firstError : "";
 }
 
 function HeaderCell({ children }) {
