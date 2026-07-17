@@ -16,10 +16,13 @@ const validationSchema = Yup.object({
     .required("La descripción es obligatoria"),
 });
 
-export default function ArticleForm({ onCancel, onSubmit }) {
+export default function ArticleForm({ initialArticle, onCancel, onSubmit }) {
   return (
     <Formik
-      initialValues={{ name: "", description: "" }}
+      initialValues={{
+        name: initialArticle?.name || "",
+        description: initialArticle?.description || "",
+      }}
       onSubmit={onSubmit}
       validationSchema={validationSchema}
     >

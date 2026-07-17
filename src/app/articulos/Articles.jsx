@@ -12,93 +12,6 @@ import ArticleForm from "./ArticleForm";
 
 const pageSize = 10;
 
-export default function Wrapper() {
-  const role = useAuth((state) => state.user?.role);
-  const [articles, setArticles] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [notification, setNotification] = useState("");
-
-  useEffect(() => {
-    let active = true;
-
-    const loadArticles = async () => {
-      const response = await authenticatedApiFetch({
-        url: "/delivery/items/",
-      });
-      if (!active) return;
-
-      if (response?.error) {
-        setError(response.message || "No fue posible cargar los artículos.");
-      } else {
-        setArticles(
-          Array.isArray(response) ? response : response.results || [],
-        );
-      }
-
-      setIsLoading(false);
-    };
-
-    loadArticles();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const closeNotification = useCallback(() => setNotification(""), []);
-
-  const createArticle = async (values, formikHelpers) => {
-    const response = await authenticatedApiFetch({
-      url: "/delivery/items/",
-      method: "POST",
-      payload: {
-        name: values.name.trim(),
-        description: values.description.trim(),
-      },
-    });
-
-    if (response?.error) {
-      formikHelpers.setStatus(
-        getApiError(response.data) ||
-          response.message ||
-          "No fue posible crear el artículo.",
-      );
-      formikHelpers.setSubmitting(false);
-      return;
-    }
-
-    setArticles((current) => [...current, response]);
-    setIsCreateOpen(false);
-    setNotification("Artículo creado correctamente");
-  };
-
-  return (
-    <ArticlesPage
-      articles={articles}
-      error={error}
-      isAdmin={role === "ADMIN"}
-      isLoading={isLoading}
-      onCreate={() => setIsCreateOpen(true)}
-    >
-      <Modal
-        onClose={() => setIsCreateOpen(false)}
-        open={isCreateOpen}
-        title="Nuevo Artículo"
-      >
-        <ArticleForm
-          onCancel={() => setIsCreateOpen(false)}
-          onSubmit={createArticle}
-        />
-      </Modal>
-      <Notification
-        message={notification}
-        onClose={closeNotification}
-      />
-    </ArticlesPage>
-  );
-}
-
 function ArticlesPage({
   articles,
   children,
@@ -106,6 +19,7 @@ function ArticlesPage({
   isAdmin,
   isLoading,
   onCreate,
+  onEdit,
 }) {
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(articles.length / pageSize));
@@ -160,7 +74,7 @@ function ArticlesPage({
                         <Cell>
                           <Button
                             className="min-h-7 px-4 py-1 text-xs"
-                            disabled
+                            onClick={() => onEdit(article)}
                             variant="secondary"
                           >
                             Editar
@@ -215,5 +129,110 @@ function StatusMessage({ children, tone = "default" }) {
     >
       {children}
     </p>
+  );
+}
+
+export default function Wrapper() {
+  const role = useAuth((state) => state.user?.role);
+  const [articles, setArticles] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [modal, setModal] = useState(null);
+  const [notification, setNotification] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    const loadArticles = async () => {
+      const response = await authenticatedApiFetch({
+        url: "/delivery/items/",
+      });
+      if (!active) return;
+
+      if (response?.error) {
+        setError(response.message || "No fue posible cargar los artículos.");
+      } else {
+        setArticles(
+          Array.isArray(response) ? response : response.results || [],
+        );
+      }
+
+      setIsLoading(false);
+    };
+
+    loadArticles();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const closeNotification = useCallback(() => setNotification(""), []);
+  const closeModal = () => setModal(null);
+
+  const saveArticle = async (values, formikHelpers) => {
+    const isEditing = modal?.type === "edit";
+    const response = await authenticatedApiFetch({
+      url: isEditing
+        ? `/delivery/items/${modal.article.id}/`
+        : "/delivery/items/",
+      method: isEditing ? "PATCH" : "POST",
+      payload: {
+        name: values.name.trim(),
+        description: values.description.trim(),
+      },
+    });
+
+    if (response?.error) {
+      formikHelpers.setStatus(
+        getApiError(response.data) ||
+          response.message ||
+          "No fue posible guardar el artículo.",
+      );
+      formikHelpers.setSubmitting(false);
+      return;
+    }
+
+    setArticles((current) =>
+      isEditing
+        ? current.map((article) =>
+            article.id === response.id ? response : article,
+          )
+        : [...current, response],
+    );
+    closeModal();
+    setNotification(
+      isEditing
+        ? "Artículo actualizado correctamente"
+        : "Artículo creado correctamente",
+    );
+  };
+
+  return (
+    <ArticlesPage
+      articles={articles}
+      error={error}
+      isAdmin={role === "ADMIN"}
+      isLoading={isLoading}
+      onCreate={() => setModal({ type: "create" })}
+      onEdit={(article) => setModal({ type: "edit", article })}
+    >
+      <Modal
+        onClose={closeModal}
+        open={Boolean(modal)}
+        title={modal?.type === "edit" ? "Editar Artículo" : "Nuevo Artículo"}
+      >
+        <ArticleForm
+          initialArticle={
+            modal?.type === "edit" ? modal.article : null
+          }
+          onCancel={closeModal}
+          onSubmit={saveArticle}
+        />
+      </Modal>
+      <Notification
+        message={notification}
+        onClose={closeNotification}
+      />
+    </ArticlesPage>
   );
 }
