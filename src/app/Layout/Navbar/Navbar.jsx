@@ -4,19 +4,28 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/app/store/useAuth";
 
-const moduleItems = [
+const publicModuleItems = [
   { label: "Rutas", href: "/rutas" },
   { label: "Eventos", href: "/eventos" },
-  { label: "Articulos", href: "/articulos" },
   { label: "Distritos", href: "/distritos" },
 ];
 
+const articlesItem = { label: "Articulos", href: "/articulos" };
 const usersItem = { label: "Usuarios", href: "/usuarios" };
 const reportsItem = { label: "Reportes", href: "/reportes" };
 
 const Navbar = () => {
   const pathname = usePathname();
   const role = useAuth((state) => state.user?.role);
+  const moduleItems =
+    role === "ADMIN" || role === "COORDINATOR"
+      ? [
+          publicModuleItems[0],
+          publicModuleItems[1],
+          articlesItem,
+          publicModuleItems[2],
+        ]
+      : publicModuleItems;
   const adminItems = role === "ADMIN" ? [usersItem, reportsItem] : [reportsItem];
   const navItems = [...moduleItems, ...adminItems];
   const activeItem =

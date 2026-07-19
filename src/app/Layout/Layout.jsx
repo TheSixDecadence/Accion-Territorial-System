@@ -6,7 +6,11 @@ import ProtectedRoute from "@/app/Auth/Components/ProtectedRoute";
 
 export default function AppShell({ children }) {
   const pathname = usePathname();
-  const allowedRoles = pathname.startsWith("/usuarios") ? ["ADMIN"] : undefined;
+  const allowedRoles = pathname.startsWith("/usuarios")
+    ? ["ADMIN"]
+    : pathname.startsWith("/articulos")
+      ? ["ADMIN", "COORDINATOR"]
+      : undefined;
 
   if (pathname === "/login") {
     return <main className="min-h-screen">{children}</main>;
