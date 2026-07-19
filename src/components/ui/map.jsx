@@ -39,6 +39,7 @@ const blankMapStyle = {
 
 function useStableValue(value) {
   const key = useMemo(() => JSON.stringify(value) ?? "", [value]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   return useMemo(() => value, [key]);
 }
 
