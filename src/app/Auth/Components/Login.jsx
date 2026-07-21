@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Field, Form, Formik } from "formik";
 import apiFetch from "@/app/Libs/apiFetch";
 import { useAuth } from "@/app/store/useAuth";
-import { getUserLoginValidationSchema } from "../utils";
+import { getUserLoginValidationSchema } from "@/app/Libs/yup";
 
 const loginControlClass =
   "mt-1 min-h-[42px] w-full rounded-md border border-white/30 bg-[#f2f2f6] px-3 text-sm text-[var(--color-text)] outline-none focus:border-white focus:ring-2 focus:ring-white/25";

@@ -1,20 +1,9 @@
 "use client";
 
 import { Field as FormikField, Form, Formik } from "formik";
-import * as Yup from "yup";
+import { articleValidationSchema } from "@/app/Libs/yup";
 import Button from "@/app/UI/Shared/Button";
 import Field, { controlClass } from "@/app/UI/Shared/Field";
-
-const validationSchema = Yup.object({
-  name: Yup.string()
-    .trim()
-    .max(100, "El nombre no puede superar 100 caracteres")
-    .required("El nombre es obligatorio"),
-  description: Yup.string()
-    .trim()
-    .max(250, "La descripción no puede superar 250 caracteres")
-    .required("La descripción es obligatoria"),
-});
 
 export default function ArticleForm({ initialArticle, onCancel, onSubmit }) {
   return (
@@ -24,7 +13,7 @@ export default function ArticleForm({ initialArticle, onCancel, onSubmit }) {
         description: initialArticle?.description || "",
       }}
       onSubmit={onSubmit}
-      validationSchema={validationSchema}
+      validationSchema={articleValidationSchema}
     >
       {({ isSubmitting, status }) => (
         <Form className="space-y-4" noValidate>

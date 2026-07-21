@@ -1,7 +1,7 @@
 "use client";
 
 import { Field as FormikField, Form, Formik } from "formik";
-import * as Yup from "yup";
+import { getUserValidationSchema } from "@/app/Libs/yup";
 import Button from "@/app/UI/Shared/Button";
 import Field, { controlClass } from "@/app/UI/Shared/Field";
 
@@ -10,23 +10,6 @@ const roles = [
   { label: "Coordinador", value: "COORDINATOR" },
   { label: "Personal", value: "STAFF" },
 ];
-
-const schema = (isEditing) =>
-  Yup.object({
-    first_name: Yup.string().trim().required("El nombre es obligatorio"),
-    last_name: Yup.string().trim().required("Los apellidos son obligatorios"),
-    email: Yup.string()
-      .trim()
-      .email("Correo electrónico inválido")
-      .required("El correo es obligatorio"),
-    phone: Yup.string().trim(),
-    role: Yup.string().oneOf(roles.map(({ value }) => value)).required(),
-    password: isEditing
-      ? Yup.string()
-      : Yup.string()
-          .min(8, "La contraseña debe tener al menos 8 caracteres")
-          .required("La contraseña es obligatoria"),
-  });
 
 export default function UserForm({ initialUser, onCancel, onSubmit }) {
   const isEditing = Boolean(initialUser);
@@ -42,7 +25,7 @@ export default function UserForm({ initialUser, onCancel, onSubmit }) {
         password: "",
       }}
       onSubmit={onSubmit}
-      validationSchema={schema(isEditing)}
+      validationSchema={getUserValidationSchema(isEditing)}
     >
       {({ isSubmitting, status }) => (
         <Form className="space-y-4" noValidate>
