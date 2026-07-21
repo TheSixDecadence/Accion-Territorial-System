@@ -225,6 +225,8 @@ function MapGeoJSON({
     );
 
     return () => {
+      if (!map.style) return;
+
       if (map.getLayer(lineLayerId)) map.removeLayer(lineLayerId);
       if (map.getLayer(fillLayerId)) map.removeLayer(fillLayerId);
       if (map.getSource(sourceId)) map.removeSource(sourceId);
