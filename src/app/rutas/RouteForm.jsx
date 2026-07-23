@@ -29,6 +29,7 @@ export default function RouteForm({
         longitude: routePoint?.longitude || "",
         address_confirmation_token: "",
         sequence_order: routePoint?.sequence_order || sequenceOrder,
+        status: routePoint?.status || "PENDING",
         notes: routePoint?.notes || "",
       }}
       onSubmit={onSubmit}
@@ -134,6 +135,27 @@ export default function RouteForm({
                   className={`${controlClass} min-h-20 resize-y py-3`}
                   id="delivery-notes"
                 />
+              </Field>
+            )}
+          </FormikField>
+
+          <FormikField name="status">
+            {({ field, meta }) => (
+              <Field
+                error={meta.touched ? meta.error : ""}
+                htmlFor="delivery-status"
+                label="Estado"
+              >
+                <select
+                  {...field}
+                  className={controlClass}
+                  id="delivery-status"
+                >
+                  <option value="PENDING">Pendiente</option>
+                  <option value="NOT_DELIVERED">No entregado</option>
+                  <option value="COMPLETED">Completado</option>
+                  <option value="CANCELLED">Cancelado</option>
+                </select>
               </Field>
             )}
           </FormikField>

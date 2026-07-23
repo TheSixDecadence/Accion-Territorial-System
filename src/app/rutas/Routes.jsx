@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { authenticatedApiFetch } from "@/app/Libs/apiFetch";
 import { useAuth } from "@/app/store/useAuth";
 import Button from "@/app/UI/Shared/Button";
@@ -11,6 +11,7 @@ import Pagination from "@/app/UI/Shared/Pagination";
 import {
   Map,
   MapControls,
+  MapFitBounds,
   MapGeoJSON,
   MapMarker,
 } from "@/components/ui/map";
@@ -25,13 +26,24 @@ const ROUTE_STATUS = {
   COMPLETED: "Completada",
   CANCELLED: "Cancelada",
 };
+const POINT_STATUS = {
+  PENDING: "Pendiente",
+  NOT_DELIVERED: "No entregado",
+  COMPLETED: "Completado",
+  CANCELLED: "Cancelado",
+};
 
 function RoutesPage({
+  dataError,
   items,
+  isLoading,
   onAddPoint,
+  onCancelPoint,
   onCreate,
   onEdit,
   onSelectRoute,
+  onViewRoute,
+  routeError,
   routeGeometry,
   routePoints,
   routes,
@@ -41,15 +53,28 @@ function RoutesPage({
   const [page, setPage] = useState(1);
   const [showRecords, setShowRecords] = useState(false);
   const selectedItem = items.find((item) => item.id === selectedPoint?.item);
+  const selectedRoute = routes.find(
+    (route) => route.id === selectedPoint?.route,
+  );
+  const routeAcceptsPoints =
+    selectedRoute &&
+    !["COMPLETED", "CANCELLED"].includes(selectedRoute.status);
+  const pointCanChange =
+    selectedPoint?.status !== "CANCELLED" &&
+    selectedRoute?.status !== "CANCELLED";
   const totalPages = Math.max(1, Math.ceil(routes.length / ROUTES_PER_PAGE));
   const currentPage = Math.min(page, totalPages);
   const visibleRoutes = routes.slice(
     (currentPage - 1) * ROUTES_PER_PAGE,
     currentPage * ROUTES_PER_PAGE,
   );
-  const visiblePoints = selectedRouteId
-    ? routePoints.filter((point) => point.route === selectedRouteId)
-    : routePoints;
+  const visiblePoints = useMemo(
+    () =>
+      selectedRouteId
+        ? routePoints.filter((point) => point.route === selectedRouteId)
+        : routePoints,
+    [routePoints, selectedRouteId],
+  );
   const visibleGeometry = selectedRouteId
     ? {
         ...routeGeometry,
@@ -58,6 +83,25 @@ function RoutesPage({
         ),
       }
     : routeGeometry;
+  const selectedCoordinates = useMemo(
+    () =>
+      selectedRouteId
+        ? visiblePoints
+            .filter(hasCoordinates)
+            .map((point) => [
+              Number(point.longitude),
+              Number(point.latitude),
+            ])
+        : [],
+    [selectedRouteId, visiblePoints],
+  );
+  const toggleRecords = () => {
+    if (showRecords) {
+      setSelectedPoint(null);
+      onSelectRoute(null);
+    }
+    setShowRecords((current) => !current);
+  };
 
   return (
     <div className="flex min-h-screen w-full flex-1 flex-col bg-[var(--color-background)]">
@@ -67,9 +111,19 @@ function RoutesPage({
         title="Rutas"
       />
 
-      <section className="relative w-full flex-1 px-5 py-6 sm:px-7 lg:px-10">
+      <section className="relative w-full flex-1 overflow-hidden px-5 py-6 sm:px-7 lg:px-10">
         <div className="relative h-[60vh] min-h-[520px] w-full overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] lg:h-[calc(100vh-8.5rem)]">
-          <Map center={CHIHUAHUA_CENTER} theme="light" zoom={11}>
+          <Map
+            center={CHIHUAHUA_CENTER}
+            loading={isLoading}
+            theme="light"
+            zoom={11}
+          >
+            <MapFitBounds
+              coordinates={selectedCoordinates}
+              fallbackCenter={CHIHUAHUA_CENTER}
+              fallbackZoom={11}
+            />
             {visibleGeometry.features.length > 0 ? (
               <MapGeoJSON
                 data={visibleGeometry}
@@ -95,11 +149,19 @@ function RoutesPage({
           <Button
             aria-expanded={showRecords}
             className="absolute top-3 left-3 z-30 min-h-8 px-3 text-xs"
-            onClick={() => setShowRecords((current) => !current)}
+            onClick={toggleRecords}
             variant="secondary"
           >
             {showRecords ? "Ocultar registros" : "Registros"}
           </Button>
+          {dataError || routeError ? (
+            <p
+              className="absolute top-14 left-3 z-10 max-w-sm rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-[var(--color-danger)] shadow-sm"
+              role="alert"
+            >
+              {dataError || routeError}
+            </p>
+          ) : null}
           {selectedPoint && (
             <div className="absolute bottom-4 left-4 z-10 w-[min(22rem,calc(100%-2rem))] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-lg">
               <p className="font-semibold text-[var(--color-primary)]">
@@ -112,28 +174,46 @@ function RoutesPage({
                 <dt className="font-medium">Teléfono</dt>
                 <dd>{selectedPoint.recipient_phone || "—"}</dd>
                 <dt className="font-medium">Estado</dt>
-                <dd>{selectedPoint.status}</dd>
+                <dd>
+                  {POINT_STATUS[selectedPoint.status] || selectedPoint.status}
+                </dd>
               </dl>
-              <button
-                className="mt-3 mr-4 text-sm font-medium text-[var(--color-primary)]"
-                onClick={() => {
-                  onAddPoint(selectedPoint.route);
-                  setSelectedPoint(null);
-                }}
-                type="button"
-              >
-                Agregar punto
-              </button>
-              <button
-                className="mt-3 mr-4 text-sm font-medium text-[var(--color-primary)]"
-                onClick={() => {
-                  onEdit(selectedPoint);
-                  setSelectedPoint(null);
-                }}
-                type="button"
-              >
-                Editar
-              </button>
+              {routeAcceptsPoints ? (
+                <button
+                  className="mt-3 mr-4 text-sm font-medium text-[var(--color-primary)]"
+                  onClick={() => {
+                    onAddPoint(selectedPoint.route);
+                    setSelectedPoint(null);
+                  }}
+                  type="button"
+                >
+                  Agregar punto
+                </button>
+              ) : null}
+              {pointCanChange ? (
+                <>
+                  <button
+                    className="mt-3 mr-4 text-sm font-medium text-[var(--color-primary)]"
+                    onClick={() => {
+                      onEdit(selectedPoint);
+                      setSelectedPoint(null);
+                    }}
+                    type="button"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    className="mt-3 mr-4 text-sm font-medium text-[var(--color-danger)]"
+                    onClick={() => {
+                      onCancelPoint(selectedPoint);
+                      setSelectedPoint(null);
+                    }}
+                    type="button"
+                  >
+                    Cancelar punto
+                  </button>
+                </>
+              ) : null}
               <button
                 className="mt-3 text-sm font-medium text-[var(--color-primary)]"
                 onClick={() => setSelectedPoint(null)}
@@ -145,8 +225,15 @@ function RoutesPage({
           )}
         </div>
 
-        {showRecords ? (
-          <aside className="absolute top-6 right-5 z-20 max-h-[calc(100%-3rem)] w-[calc(100%-2.5rem)] overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg sm:right-7 sm:w-[min(560px,calc(100%-3.5rem))] lg:right-10 lg:w-[min(44%,560px)]">
+        <aside
+          aria-hidden={!showRecords}
+          className={`absolute inset-y-6 right-5 z-20 w-[calc(100%-2.5rem)] overflow-y-auto rounded-l-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl transition-transform duration-300 ease-out sm:right-7 sm:w-[min(560px,calc(100%-3.5rem))] lg:right-10 lg:w-[min(44%,560px)] ${
+            showRecords
+              ? "translate-x-0"
+              : "pointer-events-none translate-x-[calc(100%+3rem)]"
+          }`}
+          inert={!showRecords}
+        >
           <div className="border-b border-[var(--color-border)] px-4 py-3">
             <h2 className="font-semibold text-[var(--color-primary)]">
               Registros
@@ -169,6 +256,9 @@ function RoutesPage({
                     <RouteHeader>Coordinador</RouteHeader>
                     <RouteHeader>Fecha</RouteHeader>
                     <RouteHeader>Estado</RouteHeader>
+                    <RouteHeader>
+                      <span className="sr-only">Acciones</span>
+                    </RouteHeader>
                   </tr>
                 </thead>
                 <tbody>
@@ -197,6 +287,18 @@ function RoutesPage({
                       <RouteCell>
                         {ROUTE_STATUS[route.status] || route.status}
                       </RouteCell>
+                      <RouteCell>
+                        <Button
+                          className="min-h-7 px-3 py-1 text-xs"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onViewRoute(route);
+                          }}
+                          variant="secondary"
+                        >
+                          Detalles
+                        </Button>
+                      </RouteCell>
                     </tr>
                   ))}
                 </tbody>
@@ -213,8 +315,7 @@ function RoutesPage({
               totalPages={totalPages}
             />
           ) : null}
-          </aside>
-        ) : null}
+        </aside>
       </section>
     </div>
   );
@@ -240,6 +341,150 @@ function formatRouteDate(date) {
   if (!date) return "—";
   const [year, month, day] = date.split("-");
   return `${day}/${month}/${year}`;
+}
+
+function RouteDetails({
+  items,
+  onCancel,
+  onClose,
+  onEdit,
+  onEditPoint,
+  points,
+  route,
+}) {
+  const orderedPoints = [...points].sort(
+    (a, b) => a.sequence_order - b.sequence_order,
+  );
+
+  return (
+    <div>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-sm">
+        <dt className="font-semibold">Nombre</dt>
+        <dd>{route.name}</dd>
+        <dt className="font-semibold">Descripción</dt>
+        <dd>{route.description || "—"}</dd>
+        <dt className="font-semibold">Coordinador</dt>
+        <dd>{coordinatorName(route.coordinator)}</dd>
+        <dt className="font-semibold">Fecha</dt>
+        <dd>{formatRouteDate(route.scheduled_date)}</dd>
+        <dt className="font-semibold">Estado</dt>
+        <dd>{ROUTE_STATUS[route.status] || route.status}</dd>
+        <dt className="font-semibold">Puntos</dt>
+        <dd>{points.length}</dd>
+      </dl>
+
+      <div className="mt-6 overflow-hidden rounded-lg border border-[var(--color-border)]">
+        <h3 className="border-b border-[var(--color-border)] px-3 py-2 text-sm font-semibold">
+          Puntos de entrega
+        </h3>
+        {orderedPoints.length === 0 ? (
+          <p className="px-3 py-6 text-center text-sm text-[var(--color-text-muted)]">
+            Esta ruta no tiene puntos registrados.
+          </p>
+        ) : (
+          <div className="max-h-64 overflow-y-auto">
+            {orderedPoints.map((point) => {
+              const item = items.find(
+                (currentItem) => currentItem.id === point.item,
+              );
+              const canEdit =
+                route.status !== "CANCELLED" &&
+                point.status !== "CANCELLED";
+
+              return (
+                <div
+                  className="border-b border-[var(--color-border)] p-3 text-sm last:border-b-0"
+                  key={point.id}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-[var(--color-primary)]">
+                        {point.sequence_order}. {point.recipient_name}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                        {point.full_address}
+                      </p>
+                      <p className="mt-1 text-xs">
+                        {item?.name || "Sin artículo"} ·{" "}
+                        {POINT_STATUS[point.status] || point.status}
+                      </p>
+                    </div>
+                    {canEdit ? (
+                      <Button
+                        className="min-h-7 shrink-0 px-3 py-1 text-xs"
+                        onClick={() => onEditPoint(point)}
+                        variant="secondary"
+                      >
+                        Editar
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-6 flex flex-wrap justify-end gap-3">
+        {route.status !== "CANCELLED" ? (
+          <>
+            <Button onClick={onCancel} variant="danger">
+              Cancelar Ruta
+            </Button>
+            <Button onClick={onEdit}>Editar Ruta</Button>
+          </>
+        ) : null}
+        <Button onClick={onClose} variant="secondary">
+          Cerrar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function RouteCancellation({ isSubmitting, onCancel, onConfirm, route }) {
+  return (
+    <div>
+      <p className="text-sm text-[var(--color-text-muted)]">
+        La ruta <strong>{route.name}</strong> cambiará al estado cancelada. Sus
+        datos permanecerán guardados.
+      </p>
+      <div className="mt-6 flex justify-end gap-3">
+        <Button disabled={isSubmitting} onClick={onCancel} variant="secondary">
+          Volver
+        </Button>
+        <Button disabled={isSubmitting} onClick={onConfirm} variant="danger">
+          {isSubmitting ? "Cancelando…" : "Confirmar Cancelación"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function PointCancellation({
+  isSubmitting,
+  onCancel,
+  onConfirm,
+  routePoint,
+}) {
+  return (
+    <div>
+      <p className="text-sm text-[var(--color-text-muted)]">
+        El punto de entrega de{" "}
+        <strong>{routePoint.recipient_name}</strong> cambiará al estado
+        cancelado. Sus datos permanecerán guardados.
+      </p>
+      <div className="mt-6 flex justify-end gap-3">
+        <Button disabled={isSubmitting} onClick={onCancel} variant="secondary">
+          Volver
+        </Button>
+        <Button disabled={isSubmitting} onClick={onConfirm} variant="danger">
+          {isSubmitting ? "Cancelando…" : "Confirmar Cancelación"}
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 function hasCoordinates(point) {
@@ -331,6 +576,10 @@ export default function Wrapper() {
     features: [],
   });
   const [notification, setNotification] = useState("");
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [dataError, setDataError] = useState("");
+  const [routeError, setRouteError] = useState("");
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -367,6 +616,19 @@ export default function Wrapper() {
       ]);
       if (!active) return;
 
+      const failedResponses = [
+        itemsResponse,
+        routesResponse,
+        pointsResponse,
+      ].filter((response) => response?.error);
+
+      if (failedResponses.length > 0) {
+        setDataError(
+          failedResponses[0].message ||
+            "No fue posible cargar toda la información de rutas.",
+        );
+      }
+
       if (!itemsResponse?.error) {
         setItems(
           Array.isArray(itemsResponse)
@@ -390,6 +652,8 @@ export default function Wrapper() {
             : pointsResponse.results || [],
         );
       }
+
+      setIsLoading(false);
     };
 
     loadData();
@@ -403,7 +667,7 @@ export default function Wrapper() {
     const routes = groupRoutablePoints(routePoints);
 
     const calculateRoutes = async () => {
-      const features = await Promise.all(
+      const results = await Promise.all(
         routes.map(async ([routeId, points]) => {
           const response = await authenticatedApiFetch({
             url: "/delivery/calculate-route/",
@@ -418,14 +682,23 @@ export default function Wrapper() {
             },
           });
 
-          return response?.error ? null : routeFeature(routeId, response);
+          return {
+            error: response?.error
+              ? response.message || "No fue posible calcular una ruta."
+              : "",
+            feature: response?.error
+              ? null
+              : routeFeature(routeId, response),
+          };
         }),
       );
 
       if (active) {
+        const calculationError = results.find((result) => result.error);
+        setRouteError(calculationError?.error || "");
         setRouteGeometry({
           type: "FeatureCollection",
-          features: features.filter(Boolean),
+          features: results.map((result) => result.feature).filter(Boolean),
         });
       }
     };
@@ -477,6 +750,7 @@ export default function Wrapper() {
         recipient_phone: values.recipient_phone.trim(),
         address_confirmation_token: values.address_confirmation_token,
         sequence_order: values.sequence_order,
+        status: values.status,
         notes: values.notes.trim(),
       },
     });
@@ -496,6 +770,100 @@ export default function Wrapper() {
     setNotification("Punto de entrega creado correctamente");
   };
 
+  const updateRoute = async (values, formikHelpers) => {
+    const route = modal.route;
+    const payload = {
+      name: values.name.trim(),
+      description: values.description.trim(),
+      scheduled_date: values.scheduled_date,
+      status: values.status,
+    };
+
+    if (isAdmin) payload.coordinator_id = values.coordinator_id;
+
+    const response = await authenticatedApiFetch({
+      url: `/delivery/routes/${route.id}/`,
+      method: "PATCH",
+      payload,
+    });
+
+    if (response?.error) {
+      formikHelpers.setStatus(
+        getApiError(response.data) ||
+          response.message ||
+          "No fue posible actualizar la ruta.",
+      );
+      formikHelpers.setSubmitting(false);
+      return;
+    }
+
+    setRoutes((current) =>
+      current.map((currentRoute) =>
+        currentRoute.id === response.id ? response : currentRoute,
+      ),
+    );
+    setModal(null);
+    setNotification("Ruta actualizada correctamente");
+  };
+
+  const cancelRoute = async () => {
+    const route = modal.route;
+    setIsCancelling(true);
+
+    const response = await authenticatedApiFetch({
+      url: `/delivery/routes/${route.id}/`,
+      method: "DELETE",
+    });
+
+    setIsCancelling(false);
+
+    if (response?.error) {
+      setNotification(
+        response.message || "No fue posible cancelar la ruta.",
+      );
+      return;
+    }
+
+    setRoutes((current) =>
+      current.map((currentRoute) =>
+        currentRoute.id === route.id
+          ? { ...currentRoute, status: "CANCELLED" }
+          : currentRoute,
+      ),
+    );
+    setModal(null);
+    setNotification("Ruta cancelada correctamente");
+  };
+
+  const cancelRoutePoint = async () => {
+    const routePoint = modal.routePoint;
+    setIsCancelling(true);
+
+    const response = await authenticatedApiFetch({
+      url: `/delivery/route-points/${routePoint.id}/`,
+      method: "DELETE",
+    });
+
+    setIsCancelling(false);
+
+    if (response?.error) {
+      setNotification(
+        response.message || "No fue posible cancelar el punto de entrega.",
+      );
+      return;
+    }
+
+    setRoutePoints((current) =>
+      current.map((point) =>
+        point.id === routePoint.id
+          ? { ...point, status: "CANCELLED" }
+          : point,
+      ),
+    );
+    setModal(null);
+    setNotification("Punto de entrega cancelado correctamente");
+  };
+
   const updateRoutePoint = async (values, formikHelpers) => {
     const routePoint = modal.routePoint;
     const payload = {
@@ -504,6 +872,7 @@ export default function Wrapper() {
       recipient_name: values.recipient_name.trim(),
       recipient_phone: values.recipient_phone.trim(),
       sequence_order: values.sequence_order,
+      status: values.status,
       notes: values.notes.trim(),
     };
 
@@ -537,7 +906,9 @@ export default function Wrapper() {
   return (
     <>
       <RoutesPage
+        dataError={dataError}
         items={items}
+        isLoading={isLoading}
         onAddPoint={(routeId) =>
           setModal({
             type: "point",
@@ -547,9 +918,14 @@ export default function Wrapper() {
             },
           })
         }
+        onCancelPoint={(routePoint) =>
+          setModal({ type: "pointCancel", routePoint })
+        }
         onCreate={() => setModal({ type: "route" })}
         onEdit={(routePoint) => setModal({ type: "edit", routePoint })}
         onSelectRoute={setSelectedRouteId}
+        onViewRoute={(route) => setModal({ type: "routeDetails", route })}
+        routeError={routeError}
         routeGeometry={routeGeometry}
         routePoints={routePoints}
         routes={routes}
@@ -559,14 +935,62 @@ export default function Wrapper() {
         onClose={() => setModal(null)}
         open={Boolean(modal)}
         title={
-          modal?.type === "edit"
+          modal?.type === "routeDetails"
+            ? "Detalles de la Ruta"
+            : modal?.type === "routeEdit"
+              ? "Editar Ruta"
+              : modal?.type === "routeCancel"
+                ? "Cancelar Ruta"
+                : modal?.type === "pointCancel"
+                  ? "Cancelar Punto de Entrega"
+                : modal?.type === "edit"
             ? "Editar Punto de Entrega"
             : modal?.type === "point"
               ? "Punto de Entrega"
               : "Nueva Ruta"
         }
       >
-        {modal?.type === "edit" ? (
+        {modal?.type === "routeDetails" ? (
+          <RouteDetails
+            items={items}
+            onCancel={() =>
+              setModal({ type: "routeCancel", route: modal.route })
+            }
+            onClose={() => setModal(null)}
+            onEdit={() => setModal({ type: "routeEdit", route: modal.route })}
+            onEditPoint={(routePoint) =>
+              setModal({ type: "edit", routePoint })
+            }
+            points={routePoints.filter(
+              (point) => point.route === modal.route.id,
+            )}
+            route={modal.route}
+          />
+        ) : modal?.type === "routeCancel" ? (
+          <RouteCancellation
+            isSubmitting={isCancelling}
+            onCancel={() =>
+              setModal({ type: "routeDetails", route: modal.route })
+            }
+            onConfirm={cancelRoute}
+            route={modal.route}
+          />
+        ) : modal?.type === "routeEdit" ? (
+          <NewRouteForm
+            coordinators={coordinators}
+            initialRoute={modal.route}
+            isAdmin={isAdmin}
+            onCancel={() => setModal(null)}
+            onSubmit={updateRoute}
+          />
+        ) : modal?.type === "pointCancel" ? (
+          <PointCancellation
+            isSubmitting={isCancelling}
+            onCancel={() => setModal(null)}
+            onConfirm={cancelRoutePoint}
+            routePoint={modal.routePoint}
+          />
+        ) : modal?.type === "edit" ? (
           <RouteForm
             items={items}
             onCancel={() => setModal(null)}

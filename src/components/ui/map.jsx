@@ -192,6 +192,47 @@ function MapMarker({ latitude, longitude, onClick }) {
   return null;
 }
 
+function MapFitBounds({
+  coordinates,
+  fallbackCenter,
+  fallbackZoom = 11,
+}) {
+  const { map, isLoaded } = useMap();
+
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+
+    if (coordinates.length === 0) {
+      if (fallbackCenter) {
+        map.easeTo({
+          center: fallbackCenter,
+          zoom: fallbackZoom,
+          duration: 500,
+        });
+      }
+      return;
+    }
+
+    if (coordinates.length === 1) {
+      map.easeTo({ center: coordinates[0], zoom: 15, duration: 500 });
+      return;
+    }
+
+    const bounds = coordinates.reduce(
+      (currentBounds, coordinate) => currentBounds.extend(coordinate),
+      new MapLibreGL.LngLatBounds(coordinates[0], coordinates[0]),
+    );
+
+    map.fitBounds(bounds, {
+      padding: 70,
+      maxZoom: 15,
+      duration: 500,
+    });
+  }, [coordinates, fallbackCenter, fallbackZoom, isLoaded, map]);
+
+  return null;
+}
+
 function MapGeoJSON({
   data,
   id: providedId,
@@ -293,4 +334,4 @@ function MapGeoJSON({
   return null;
 }
 
-export { Map, MapControls, MapGeoJSON, MapMarker };
+export { Map, MapControls, MapFitBounds, MapGeoJSON, MapMarker };

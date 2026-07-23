@@ -15,18 +15,21 @@ function getCoordinatorName(coordinator) {
 
 export default function NewRouteForm({
   coordinators,
+  initialRoute,
   isAdmin,
   onCancel,
   onSubmit,
 }) {
+  const isEditing = Boolean(initialRoute);
+
   return (
     <Formik
       initialValues={{
-        name: "",
-        description: "",
-        coordinator_id: "",
-        scheduled_date: "",
-        status: "PENDING",
+        name: initialRoute?.name || "",
+        description: initialRoute?.description || "",
+        coordinator_id: initialRoute?.coordinator?.id || "",
+        scheduled_date: initialRoute?.scheduled_date || "",
+        status: initialRoute?.status || "PENDING",
       }}
       onSubmit={onSubmit}
       validationSchema={getNewRouteValidationSchema(isAdmin)}
@@ -148,7 +151,11 @@ export default function NewRouteForm({
               Cancelar
             </Button>
             <Button disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Guardando…" : "Crear Ruta"}
+              {isSubmitting
+                ? "Guardando…"
+                : isEditing
+                  ? "Guardar Cambios"
+                  : "Crear Ruta"}
             </Button>
           </div>
         </Form>

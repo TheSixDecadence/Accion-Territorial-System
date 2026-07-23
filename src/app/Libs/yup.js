@@ -56,6 +56,9 @@ export const getRoutePointValidationSchema = (originalAddress = "") =>
       (token, context) =>
         Boolean(token) || context.parent.address === originalAddress,
     ),
+    status: Yup.string()
+      .oneOf(["PENDING", "NOT_DELIVERED", "COMPLETED", "CANCELLED"])
+      .required("El estado es obligatorio"),
     notes: Yup.string().trim(),
   });
 
