@@ -167,9 +167,35 @@ function MapControls({ position = "top-right", className }) {
   );
 }
 
+function MapMarker({ latitude, longitude, onClick }) {
+  const { map } = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    const marker = new MapLibreGL.Marker({ color: "#2e3180" })
+      .setLngLat([longitude, latitude])
+      .addTo(map);
+    const element = marker.getElement();
+
+    if (onClick) {
+      element.style.cursor = "pointer";
+      element.addEventListener("click", onClick);
+    }
+
+    return () => {
+      if (onClick) element.removeEventListener("click", onClick);
+      marker.remove();
+    };
+  }, [latitude, longitude, map, onClick]);
+
+  return null;
+}
+
 function MapGeoJSON({
   data,
   id: providedId,
+  fill = true,
   fillPaint,
   linePaint,
   beforeId,
@@ -205,15 +231,17 @@ function MapGeoJSON({
       type: "geojson",
       data,
     });
-    map.addLayer(
-      {
-        id: fillLayerId,
-        type: "fill",
-        source: sourceId,
-        paint: resolvedFillPaint,
-      },
-      beforeId,
-    );
+    if (fill) {
+      map.addLayer(
+        {
+          id: fillLayerId,
+          type: "fill",
+          source: sourceId,
+          paint: resolvedFillPaint,
+        },
+        beforeId,
+      );
+    }
     map.addLayer(
       {
         id: lineLayerId,
@@ -244,9 +272,11 @@ function MapGeoJSON({
   useEffect(() => {
     if (!map || !isLoaded) return;
 
-    Object.entries(resolvedFillPaint).forEach(([property, value]) => {
-      map.setPaintProperty(fillLayerId, property, value);
-    });
+    if (map.getLayer(fillLayerId)) {
+      Object.entries(resolvedFillPaint).forEach(([property, value]) => {
+        map.setPaintProperty(fillLayerId, property, value);
+      });
+    }
     Object.entries(resolvedLinePaint).forEach(([property, value]) => {
       map.setPaintProperty(lineLayerId, property, value);
     });
@@ -254,6 +284,7 @@ function MapGeoJSON({
     map,
     isLoaded,
     fillLayerId,
+    fill,
     lineLayerId,
     resolvedFillPaint,
     resolvedLinePaint,
@@ -262,4 +293,4 @@ function MapGeoJSON({
   return null;
 }
 
-export { Map, MapControls, MapGeoJSON };
+export { Map, MapControls, MapGeoJSON, MapMarker };

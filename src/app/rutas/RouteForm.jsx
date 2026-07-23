@@ -3,30 +3,38 @@
 import { useEffect, useState } from "react";
 import { Field as FormikField, Form, Formik } from "formik";
 import { authenticatedApiFetch } from "@/app/Libs/apiFetch";
-import { routeValidationSchema } from "@/app/Libs/yup";
+import { getRoutePointValidationSchema } from "@/app/Libs/yup";
 import Button from "@/app/UI/Shared/Button";
 import Field, { controlClass } from "@/app/UI/Shared/Field";
 
-export default function RouteForm({ onCancel }) {
+export default function RouteForm({
+  items,
+  onCancel,
+  onSubmit,
+  routeId,
+  routePoint,
+  sequenceOrder = 1,
+}) {
+  const originalAddress = routePoint?.full_address || "";
+
   return (
     <Formik
       initialValues={{
-        recipient_name: "",
-        recipient_phone: "",
-        item: "",
-        address: "",
-        latitude: "",
-        longitude: "",
+        route: routeId || routePoint?.route || "",
+        recipient_name: routePoint?.recipient_name || "",
+        recipient_phone: routePoint?.recipient_phone || "",
+        item: routePoint?.item || "",
+        address: originalAddress,
+        latitude: routePoint?.latitude || "",
+        longitude: routePoint?.longitude || "",
         address_confirmation_token: "",
-        notes: "",
+        sequence_order: routePoint?.sequence_order || sequenceOrder,
+        notes: routePoint?.notes || "",
       }}
-      onSubmit={(_, { setStatus, setSubmitting }) => {
-        setStatus("El formulario está listo. Falta conectarlo al backend.");
-        setSubmitting(false);
-      }}
-      validationSchema={routeValidationSchema}
+      onSubmit={onSubmit}
+      validationSchema={getRoutePointValidationSchema(originalAddress)}
     >
-      {({ isSubmitting, setFieldValue, status, values }) => (
+      {({ errors, isSubmitting, setFieldValue, status, touched, values }) => (
         <Form className="space-y-4" noValidate>
           <FormikField name="recipient_name">
             {({ field, meta }) => (
@@ -73,12 +81,18 @@ export default function RouteForm({ onCancel }) {
                   htmlFor="delivery-item"
                   label="Artículo"
                 >
-                  <input
+                  <select
                     {...field}
                     className={controlClass}
                     id="delivery-item"
-                    type="text"
-                  />
+                  >
+                    <option value="">Seleccionar artículo</option>
+                    {items.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
               )}
             </FormikField>
@@ -86,8 +100,8 @@ export default function RouteForm({ onCancel }) {
 
           <AddressSearch
             error={
-              values.address && !values.address_confirmation_token
-                ? "Selecciona una dirección de los resultados"
+              touched.address || touched.address_confirmation_token
+                ? errors.address_confirmation_token || errors.address || ""
                 : ""
             }
             onChange={(value) => {
@@ -138,7 +152,7 @@ export default function RouteForm({ onCancel }) {
               Cancelar
             </Button>
             <Button disabled={isSubmitting} type="submit">
-              Guardar Punto
+              {routePoint ? "Guardar Cambios" : "Guardar Punto"}
             </Button>
           </div>
         </Form>
@@ -151,15 +165,12 @@ function AddressSearch({ error, onChange, onSelect, value }) {
   const [results, setResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
-  const [selectedAddress, setSelectedAddress] = useState("");
+  const [selectedAddress, setSelectedAddress] = useState(value);
 
   useEffect(() => {
     const query = value.trim();
 
     if (query.length < 3 || query === selectedAddress) {
-      setResults([]);
-      setSearchError("");
-      setIsSearching(false);
       return;
     }
 
@@ -210,6 +221,9 @@ function AddressSearch({ error, onChange, onSelect, value }) {
           id="delivery-address"
           onChange={(event) => {
             setSelectedAddress("");
+            setResults([]);
+            setSearchError("");
+            setIsSearching(false);
             onChange(event.target.value);
           }}
           type="text"

@@ -38,18 +38,40 @@ export const articleValidationSchema = Yup.object({
     .required("La descripción es obligatoria"),
 });
 
-export const routeValidationSchema = Yup.object({
-  recipient_name: Yup.string()
-    .trim()
-    .max(200, "El destinatario no puede superar 200 caracteres")
-    .required("El destinatario es obligatorio"),
-  recipient_phone: Yup.string()
-    .trim()
-    .max(20, "El teléfono no puede superar 20 caracteres"),
-  item: Yup.string().trim().required("El artículo es obligatorio"),
-  address: Yup.string().trim().required("La dirección es obligatoria"),
-  address_confirmation_token: Yup.string().required(
-    "Selecciona una dirección de los resultados",
-  ),
-  notes: Yup.string().trim(),
-});
+export const getRoutePointValidationSchema = (originalAddress = "") =>
+  Yup.object({
+    route: Yup.string().trim().required("El ID de la ruta es obligatorio"),
+    recipient_name: Yup.string()
+      .trim()
+      .max(200, "El destinatario no puede superar 200 caracteres")
+      .required("El destinatario es obligatorio"),
+    recipient_phone: Yup.string()
+      .trim()
+      .max(20, "El teléfono no puede superar 20 caracteres"),
+    item: Yup.string().trim().required("El artículo es obligatorio"),
+    address: Yup.string().trim().required("La dirección es obligatoria"),
+    address_confirmation_token: Yup.string().test(
+      "confirmed-address",
+      "Selecciona una dirección de los resultados",
+      (token, context) =>
+        Boolean(token) || context.parent.address === originalAddress,
+    ),
+    notes: Yup.string().trim(),
+  });
+
+export const getNewRouteValidationSchema = (isAdmin) =>
+  Yup.object({
+    name: Yup.string()
+      .trim()
+      .max(150, "El nombre no puede superar 150 caracteres")
+      .required("El nombre es obligatorio"),
+    description: Yup.string()
+      .trim()
+      .max(250, "La descripción no puede superar 250 caracteres")
+      .required("La descripción es obligatoria"),
+    coordinator_id: isAdmin
+      ? Yup.string().required("El coordinador es obligatorio")
+      : Yup.string(),
+    scheduled_date: Yup.string().required("La fecha es obligatoria"),
+    status: Yup.string().required("El estado es obligatorio"),
+  });
