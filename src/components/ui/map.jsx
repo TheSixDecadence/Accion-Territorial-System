@@ -167,9 +167,76 @@ function MapControls({ position = "top-right", className }) {
   );
 }
 
+function MapMarker({ latitude, longitude, onClick }) {
+  const { map } = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    const marker = new MapLibreGL.Marker({ color: "#2e3180" })
+      .setLngLat([longitude, latitude])
+      .addTo(map);
+    const element = marker.getElement();
+
+    if (onClick) {
+      element.style.cursor = "pointer";
+      element.addEventListener("click", onClick);
+    }
+
+    return () => {
+      if (onClick) element.removeEventListener("click", onClick);
+      marker.remove();
+    };
+  }, [latitude, longitude, map, onClick]);
+
+  return null;
+}
+
+function MapFitBounds({
+  coordinates,
+  fallbackCenter,
+  fallbackZoom = 11,
+}) {
+  const { map, isLoaded } = useMap();
+
+  useEffect(() => {
+    if (!map || !isLoaded) return;
+
+    if (coordinates.length === 0) {
+      if (fallbackCenter) {
+        map.easeTo({
+          center: fallbackCenter,
+          zoom: fallbackZoom,
+          duration: 500,
+        });
+      }
+      return;
+    }
+
+    if (coordinates.length === 1) {
+      map.easeTo({ center: coordinates[0], zoom: 15, duration: 500 });
+      return;
+    }
+
+    const bounds = coordinates.reduce(
+      (currentBounds, coordinate) => currentBounds.extend(coordinate),
+      new MapLibreGL.LngLatBounds(coordinates[0], coordinates[0]),
+    );
+
+    map.fitBounds(bounds, {
+      padding: 70,
+      maxZoom: 15,
+      duration: 500,
+    });
+  }, [coordinates, fallbackCenter, fallbackZoom, isLoaded, map]);
+
+  return null;
+}
+
 function MapGeoJSON({
   data,
   id: providedId,
+  fill = true,
   fillPaint,
   linePaint,
   beforeId,
@@ -205,15 +272,17 @@ function MapGeoJSON({
       type: "geojson",
       data,
     });
-    map.addLayer(
-      {
-        id: fillLayerId,
-        type: "fill",
-        source: sourceId,
-        paint: resolvedFillPaint,
-      },
-      beforeId,
-    );
+    if (fill) {
+      map.addLayer(
+        {
+          id: fillLayerId,
+          type: "fill",
+          source: sourceId,
+          paint: resolvedFillPaint,
+        },
+        beforeId,
+      );
+    }
     map.addLayer(
       {
         id: lineLayerId,
@@ -225,6 +294,8 @@ function MapGeoJSON({
     );
 
     return () => {
+      if (!map.style) return;
+
       if (map.getLayer(lineLayerId)) map.removeLayer(lineLayerId);
       if (map.getLayer(fillLayerId)) map.removeLayer(fillLayerId);
       if (map.getSource(sourceId)) map.removeSource(sourceId);
@@ -242,9 +313,11 @@ function MapGeoJSON({
   useEffect(() => {
     if (!map || !isLoaded) return;
 
-    Object.entries(resolvedFillPaint).forEach(([property, value]) => {
-      map.setPaintProperty(fillLayerId, property, value);
-    });
+    if (map.getLayer(fillLayerId)) {
+      Object.entries(resolvedFillPaint).forEach(([property, value]) => {
+        map.setPaintProperty(fillLayerId, property, value);
+      });
+    }
     Object.entries(resolvedLinePaint).forEach(([property, value]) => {
       map.setPaintProperty(lineLayerId, property, value);
     });
@@ -252,6 +325,7 @@ function MapGeoJSON({
     map,
     isLoaded,
     fillLayerId,
+    fill,
     lineLayerId,
     resolvedFillPaint,
     resolvedLinePaint,
@@ -260,4 +334,4 @@ function MapGeoJSON({
   return null;
 }
 
-export { Map, MapControls, MapGeoJSON };
+export { Map, MapControls, MapFitBounds, MapGeoJSON, MapMarker };
