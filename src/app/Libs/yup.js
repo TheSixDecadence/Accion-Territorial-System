@@ -79,7 +79,8 @@ export const getNewRouteValidationSchema = (isAdmin) =>
     status: Yup.string().required("El estado es obligatorio"),
   });
 
-export const eventValidationSchema = Yup.object({
+export const getEventValidationSchema = (originalAddress = "") =>
+  Yup.object({
   title: Yup.string()
     .trim()
     .max(150, "El título no puede superar 150 caracteres")
@@ -100,7 +101,22 @@ export const eventValidationSchema = Yup.object({
     .max(150, "El lugar no puede superar 150 caracteres")
     .required("El lugar es obligatorio"),
   address: Yup.string().trim().required("La dirección es obligatoria"),
+  address_confirmation_token: Yup.string().test(
+    "confirmed-address",
+    "Selecciona una dirección de los resultados",
+    (token, context) =>
+      Boolean(token) || context.parent.address === originalAddress,
+  ),
   status: Yup.string()
     .oneOf(["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
     .required("El estado es obligatorio"),
+  });
+
+export const eventStaffValidationSchema = Yup.object({
+  user: Yup.string().required("Selecciona un usuario"),
+  assigned_role: Yup.string()
+    .trim()
+    .max(100, "La función no puede superar 100 caracteres")
+    .required("La función es obligatoria"),
+  notes: Yup.string().trim(),
 });
