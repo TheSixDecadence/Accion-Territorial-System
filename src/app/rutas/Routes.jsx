@@ -12,7 +12,7 @@ function RoutesPage({ onCreate }) {
   return (
     <div className="flex min-h-screen w-full flex-1 flex-col bg-[var(--color-background)]">
       <PageHeader
-        actionLabel="Nueva Ruta"
+        actionLabel="Nuevo Punto de Entrega"
         onAction={onCreate}
         title="Rutas"
       />
@@ -37,7 +37,7 @@ export default function Wrapper() {
       <Modal
         onClose={() => setIsFormOpen(false)}
         open={isFormOpen}
-        title="Nueva Ruta"
+        title="Nuevo Punto de Entrega"
       >
         <RouteForm onCancel={() => setIsFormOpen(false)} />
       </Modal>

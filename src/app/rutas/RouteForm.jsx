@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Field as FormikField, Form, Formik } from "formik";
+import { authenticatedApiFetch } from "@/app/Libs/apiFetch";
 import { routeValidationSchema } from "@/app/Libs/yup";
 import Button from "@/app/UI/Shared/Button";
 import Field, { controlClass } from "@/app/UI/Shared/Field";
@@ -9,11 +11,14 @@ export default function RouteForm({ onCancel }) {
   return (
     <Formik
       initialValues={{
-        name: "",
-        description: "",
-        coordinator: "",
-        scheduled_date: "",
-        status: "PENDING",
+        recipient_name: "",
+        recipient_phone: "",
+        item: "",
+        address: "",
+        latitude: "",
+        longitude: "",
+        address_confirmation_token: "",
+        notes: "",
       }}
       onSubmit={(_, { setStatus, setSubmitting }) => {
         setStatus("El formulario está listo. Falta conectarlo al backend.");
@@ -21,55 +26,21 @@ export default function RouteForm({ onCancel }) {
       }}
       validationSchema={routeValidationSchema}
     >
-      {({ isSubmitting, status }) => (
+      {({ isSubmitting, setFieldValue, status, values }) => (
         <Form className="space-y-4" noValidate>
-          <FormikField name="name">
+          <FormikField name="recipient_name">
             {({ field, meta }) => (
               <Field
                 error={meta.touched ? meta.error : ""}
-                htmlFor="route-name"
-                label="Nombre"
+                htmlFor="delivery-recipient"
+                label="Destinatario"
               >
                 <input
                   {...field}
                   autoFocus
                   className={controlClass}
-                  id="route-name"
-                  maxLength={150}
-                  type="text"
-                />
-              </Field>
-            )}
-          </FormikField>
-
-          <FormikField name="description">
-            {({ field, meta }) => (
-              <Field
-                error={meta.touched ? meta.error : ""}
-                htmlFor="route-description"
-                label="Descripción"
-              >
-                <textarea
-                  {...field}
-                  className={`${controlClass} min-h-24 resize-y py-3`}
-                  id="route-description"
-                  maxLength={250}
-                />
-              </Field>
-            )}
-          </FormikField>
-
-          <FormikField name="coordinator">
-            {({ field, meta }) => (
-              <Field
-                error={meta.touched ? meta.error : ""}
-                htmlFor="route-coordinator"
-                label="Coordinador"
-              >
-                <input
-                  {...field}
-                  className={controlClass}
-                  id="route-coordinator"
+                  id="delivery-recipient"
+                  maxLength={200}
                   type="text"
                 />
               </Field>
@@ -77,44 +48,81 @@ export default function RouteForm({ onCancel }) {
           </FormikField>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormikField name="scheduled_date">
+            <FormikField name="recipient_phone">
               {({ field, meta }) => (
                 <Field
                   error={meta.touched ? meta.error : ""}
-                  htmlFor="route-date"
-                  label="Fecha programada"
+                  htmlFor="delivery-phone"
+                  label="Teléfono"
                 >
                   <input
                     {...field}
                     className={controlClass}
-                    id="route-date"
-                    type="date"
+                    id="delivery-phone"
+                    maxLength={20}
+                    type="tel"
                   />
                 </Field>
               )}
             </FormikField>
 
-            <FormikField name="status">
+            <FormikField name="item">
               {({ field, meta }) => (
                 <Field
                   error={meta.touched ? meta.error : ""}
-                  htmlFor="route-status"
-                  label="Estado"
+                  htmlFor="delivery-item"
+                  label="Artículo"
                 >
-                  <select
+                  <input
                     {...field}
                     className={controlClass}
-                    id="route-status"
-                  >
-                    <option value="PENDING">Pendiente</option>
-                    <option value="IN_PROGRESS">En progreso</option>
-                    <option value="COMPLETED">Completada</option>
-                    <option value="CANCELLED">Cancelada</option>
-                  </select>
+                    id="delivery-item"
+                    type="text"
+                  />
                 </Field>
               )}
             </FormikField>
           </div>
+
+          <AddressSearch
+            error={
+              values.address && !values.address_confirmation_token
+                ? "Selecciona una dirección de los resultados"
+                : ""
+            }
+            onChange={(value) => {
+              setFieldValue("address", value);
+              setFieldValue("address_confirmation_token", "");
+              setFieldValue("latitude", "");
+              setFieldValue("longitude", "");
+            }}
+            onSelect={(result) => {
+              setFieldValue("address", result.full_address);
+              setFieldValue(
+                "address_confirmation_token",
+                result.confirmation_token,
+              );
+              setFieldValue("latitude", result.latitude);
+              setFieldValue("longitude", result.longitude);
+            }}
+            value={values.address}
+          />
+
+          <FormikField name="notes">
+            {({ field, meta }) => (
+              <Field
+                error={meta.touched ? meta.error : ""}
+                htmlFor="delivery-notes"
+                label="Notas"
+              >
+                <textarea
+                  {...field}
+                  className={`${controlClass} min-h-20 resize-y py-3`}
+                  id="delivery-notes"
+                />
+              </Field>
+            )}
+          </FormikField>
 
           {status ? (
             <p
@@ -130,11 +138,106 @@ export default function RouteForm({ onCancel }) {
               Cancelar
             </Button>
             <Button disabled={isSubmitting} type="submit">
-              Guardar Ruta
+              Guardar Punto
             </Button>
           </div>
         </Form>
       )}
     </Formik>
+  );
+}
+
+function AddressSearch({ error, onChange, onSelect, value }) {
+  const [results, setResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [selectedAddress, setSelectedAddress] = useState("");
+
+  useEffect(() => {
+    const query = value.trim();
+
+    if (query.length < 3 || query === selectedAddress) {
+      setResults([]);
+      setSearchError("");
+      setIsSearching(false);
+      return;
+    }
+
+    let active = true;
+    const timeoutId = window.setTimeout(async () => {
+      setIsSearching(true);
+      setSearchError("");
+
+      const response = await authenticatedApiFetch({
+        url: `/delivery/address-search/?q=${encodeURIComponent(query)}`,
+      });
+      if (!active) return;
+
+      if (response?.error) {
+        setResults([]);
+        setSearchError(
+          response.message || "No fue posible buscar la dirección.",
+        );
+      } else {
+        setResults(response.results || []);
+      }
+
+      setIsSearching(false);
+    }, 400);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [selectedAddress, value]);
+
+  const selectResult = (result) => {
+    setSelectedAddress(result.full_address);
+    setResults([]);
+    onSelect(result);
+  };
+
+  return (
+    <Field
+      error={error || searchError}
+      htmlFor="delivery-address"
+      label="Dirección"
+    >
+      <div className="relative">
+        <input
+          autoComplete="off"
+          className={controlClass}
+          id="delivery-address"
+          onChange={(event) => {
+            setSelectedAddress("");
+            onChange(event.target.value);
+          }}
+          type="text"
+          value={value}
+        />
+
+        {isSearching ? (
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+            Buscando dirección…
+          </p>
+        ) : null}
+
+        {results.length > 0 ? (
+          <ul className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
+            {results.map((result) => (
+              <li key={`${result.tomtom_place_id}-${result.latitude}`}>
+                <button
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-background)]"
+                  onClick={() => selectResult(result)}
+                  type="button"
+                >
+                  {result.full_address}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    </Field>
   );
 }
