@@ -78,3 +78,29 @@ export const getNewRouteValidationSchema = (isAdmin) =>
     scheduled_date: Yup.string().required("La fecha es obligatoria"),
     status: Yup.string().required("El estado es obligatorio"),
   });
+
+export const eventValidationSchema = Yup.object({
+  title: Yup.string()
+    .trim()
+    .max(150, "El título no puede superar 150 caracteres")
+    .required("El título es obligatorio"),
+  description: Yup.string().trim(),
+  event_date: Yup.string().required("La fecha es obligatoria"),
+  start_time: Yup.string().required("La hora de inicio es obligatoria"),
+  end_time: Yup.string().test(
+    "after-start",
+    "La hora final debe ser posterior a la hora de inicio",
+    (endTime, context) =>
+      !endTime ||
+      !context.parent.start_time ||
+      endTime > context.parent.start_time,
+  ),
+  location_name: Yup.string()
+    .trim()
+    .max(150, "El lugar no puede superar 150 caracteres")
+    .required("El lugar es obligatorio"),
+  address: Yup.string().trim().required("La dirección es obligatoria"),
+  status: Yup.string()
+    .oneOf(["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
+    .required("El estado es obligatorio"),
+});
