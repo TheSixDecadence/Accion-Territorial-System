@@ -7,6 +7,7 @@ import Button from "@/app/UI/Shared/Button";
 import Modal from "@/app/UI/Shared/Modal";
 import Notification from "@/app/UI/Shared/Notification";
 import PageHeader from "@/app/UI/Shared/PageHeader";
+import Pagination from "@/app/UI/Shared/Pagination";
 import { Map, MapControls, MapMarker } from "@/components/ui/map";
 import EventForm from "./EventForm";
 
@@ -16,6 +17,7 @@ const EVENT_STATUS = {
   COMPLETED: "Completado",
   CANCELLED: "Cancelado",
 };
+const EVENTS_PER_PAGE = 9;
 
 function EventsPage({
   drawerEvent,
@@ -26,6 +28,11 @@ function EventsPage({
   onCloseDrawer,
   onCreate,
   onEdit,
+  onNextPage,
+  onPreviousPage,
+  page,
+  totalEvents,
+  totalPages,
   onView,
 }) {
   return (
@@ -44,10 +51,19 @@ function EventsPage({
         ) : events.length === 0 ? (
           <StatusMessage>No hay eventos registrados.</StatusMessage>
         ) : (
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {events.map((event) => (
-              <EventCard event={event} key={event.id} onView={onView} />
-            ))}
+          <div>
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {events.map((event) => (
+                <EventCard event={event} key={event.id} onView={onView} />
+              ))}
+            </div>
+            <Pagination
+              label={`Mostrando ${(page - 1) * EVENTS_PER_PAGE + 1} a ${Math.min(page * EVENTS_PER_PAGE, totalEvents)} de ${totalEvents} eventos`}
+              onNext={onNextPage}
+              onPrevious={onPreviousPage}
+              page={page}
+              totalPages={totalPages}
+            />
           </div>
         )}
       </section>
@@ -151,10 +167,6 @@ function EventDetailsDrawer({ event, onCancel, onClose, onEdit }) {
         <dd>{event.address}</dd>
         <dt className="font-semibold">Estado</dt>
         <dd>{EVENT_STATUS[event.status] || event.status}</dd>
-        <dt className="font-semibold">Actividades</dt>
-        <dd>{event.activities?.length || 0}</dd>
-        <dt className="font-semibold">Recursos</dt>
-        <dd>{event.resources?.length || 0}</dd>
             </dl>
 
             <section className="mt-6">
@@ -295,7 +307,13 @@ export default function Wrapper() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [users, setUsers] = useState([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [page, setPage] = useState(1);
   const isAdmin = user?.role === "ADMIN";
+  const totalPages = Math.max(1, Math.ceil(events.length / EVENTS_PER_PAGE));
+  const visibleEvents = events.slice(
+    (page - 1) * EVENTS_PER_PAGE,
+    page * EVENTS_PER_PAGE,
+  );
 
   useEffect(() => {
     let active = true;
@@ -309,9 +327,8 @@ export default function Wrapper() {
       if (response?.error) {
         setError(response.message || "No fue posible cargar los eventos.");
       } else {
-        setEvents(
-          Array.isArray(response) ? response : response.results || [],
-        );
+        setEvents(Array.isArray(response) ? response : response.results || []);
+        setPage(1);
       }
 
       setIsLoading(false);
@@ -351,9 +368,12 @@ export default function Wrapper() {
       return;
     }
 
-    const staffError = await syncEventStaff(response.id, values.staff, []);
+    const staffError = isAdmin
+      ? await syncEventStaff(response.id, values.staff, [])
+      : "";
     const completeEvent = await fetchEvent(response.id);
     setEvents((current) => [completeEvent || response, ...current]);
+    setPage(1);
     setModal(null);
     setNotification(
       staffError
@@ -396,11 +416,9 @@ export default function Wrapper() {
       return;
     }
 
-    const staffError = await syncEventStaff(
-      response.id,
-      values.staff,
-      event.staff || [],
-    );
+    const staffError = isAdmin
+      ? await syncEventStaff(response.id, values.staff, event.staff || [])
+      : "";
     const completeEvent = await fetchEvent(response.id);
     setEvents((current) =>
       current.map((currentEvent) =>
@@ -533,7 +551,7 @@ export default function Wrapper() {
       <EventsPage
         drawerEvent={drawerEvent}
         error={error}
-        events={events}
+        events={visibleEvents}
         isLoading={isLoading}
         onCancel={() => {
           setModal({ type: "cancel", event: drawerEvent });
@@ -545,6 +563,11 @@ export default function Wrapper() {
           openEventForm("edit", drawerEvent);
           setDrawerEvent(null);
         }}
+        onNextPage={() => setPage((current) => Math.min(current + 1, totalPages))}
+        onPreviousPage={() => setPage((current) => Math.max(current - 1, 1))}
+        page={page}
+        totalEvents={events.length}
+        totalPages={totalPages}
         onView={setDrawerEvent}
       />
       <Modal
